@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>RAKSHASSAN 🔍</title>
+  <style>
+    body {
+      background: #0f0c0c;
+      color: #fff;
+      font-family: 'Georgia', serif;
+      text-align: center;
+      padding: 3rem;
+    }
+    h1 {
+      color: red;
+      font-size: 3rem;
+      text-shadow: 2px 2px 8px #ff0000;
+    }
+    input {
+      padding: 1rem;
+      width: 60%;
+      max-width: 500px;
+      font-size: 1.2rem;
+      background: #1a0e0e;
+      border: 2px solid #900;
+      color: #fff;
+      border-radius: 8px;
+    }
+    #result {
+      margin-top: 2rem;
+      text-align: left;
+      padding: 1rem;
+      border-top: 1px solid #444;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .question {
+      cursor: pointer;
+      margin: 1rem 0;
+      padding: 0.5rem;
+      background: #222;
+      border-left: 4px solid #ff0055;
+      transition: background 0.3s ease;
+    }
+    .question:hover {
+      background: #330000;
+    }
+    .answer {
+      margin-top: 0.5rem;
+      padding-left: 1.5rem;
+      color: cyan;
+    }
+    footer {
+      margin-top: 3rem;
+      font-size: 0.9rem;
+      color: #999;
+    }
+
+    /* Sidebar styles */
+    #sidebarToggle {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      font-size: 2rem;
+      cursor: pointer;
+      z-index: 1001;
+      background-color: #1a0e0e;
+      border-radius: 5px;
+      padding: 5px 10px;
+      border: 1px solid red;
+    }
+
+    #sidebar {
+      position: fixed;
+      top: 0;
+      left: -250px;
+      width: 220px;
+      height: 100%;
+      background: #1a0e0e;
+      padding: 2rem 1rem;
+      box-shadow: 2px 0 10px rgba(255, 0, 0, 0.5);
+      transition: left 0.3s ease;
+      z-index: 1000;
+    }
+
+    #sidebar button {
+      display: block;
+      width: 100%;
+      margin: 1rem 0;
+      padding: 0.5rem;
+      background: #ff0055;
+      border: none;
+      font-family: monospace;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    #sidebar.show {
+      left: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar Toggle Icon -->
+  <div id="sidebarToggle">☰</div>
+
+  <!-- Sidebar Content -->
+  <div id="sidebar">
+    <button onclick="location.href='apps/shoot.html'">📖 play shooting game</button>
+    <button onclick="location.href='public chat bot/index.html'">🛠 Public chat X</button>
+    <button onclick="location.href='redtiger/index.html'">📞 Red Tiger</button>
+    <button onclick="location.href='index.html'">🏠 Home</button>
+  </div>
+
+  <h1>RAKSHASSAN 🔍</h1>
+  <p><em>“Your Rakshassan is ready boss.”</em></p>
+  <input type="text" id="searchBox" placeholder="Type to search..." onkeyup="search()">
+  <div id="result"></div>
+  <footer>
+        👁 Created by Athul | CEO of Crimson Vault | Crimson Youth 
+  </footer>
+
+  <script src="script.js"> </script>
+</body>
+</html>
