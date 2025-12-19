@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Athul Vinod .M | 3D Portfolio</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden; /* vital for mobile to prevent scroll bounce */
+            background-color: #050510;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            touch-action: none; /* disables browser gestures to allow 3D interaction */
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+            pointer-events: none;
+            transition: opacity 0.5s;
+            text-transform: uppercase;
+            font-weight: bold;
+            color: #00ffff;
+            text-shadow: 0 0 10px #00ffff;
+            text-align: center;
+            width: 80%;
+        }
+
+        .ui-layer {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            z-index: 5;
+            pointer-events: none;
+            opacity: 0.7;
+            font-size: 0.8rem;
+            text-align: center;
+        }
+    </style>
+    
+    <!-- Import Map for Three.js and Addons -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+                "gsap": "https://unpkg.com/gsap@3.12.5/index.js"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="loading">Initializing 3D World...</div>
+    <div id="canvas-container"></div>
+    <div class="ui-layer">
+        <p>Interactive 3D Scene • Drag to Rotate • Tap Blocks</p>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+        import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+
+        // --- CONFIGURATION ---
+        const config = {
+            mainText: "Athul Vinod .M",
+            subTexts: [
+                "Web Developer",
+                "Frontend Developer", 
+                "Fullstack Developer", 
+                "Backend Developer"
+            ],
+            colors: {
+                background: 0x050510,
+                mainText: 0x00ffff,
+                subText: 0xff00aa,
+                blocks: [0x00ffff, 0xff00aa, 0x4444ff, 0x222222]
+            }
+        };
+
+        // --- SCENE SETUP ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(config.colors.background);
+        scene.fog = new THREE.FogExp2(config.colors.background, 0.02);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        
+        // Initial responsive camera positioning
+        updateCameraPosition();
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limit pixel ratio for mobile performance
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // --- POST PROCESSING (BLOOM) ---
+        const renderScene = new RenderPass(scene, camera);
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+        bloomPass.threshold = 0.1;
+        bloomPass.strength = 0.4;
+        bloomPass.radius = 0.5;
+
+        const composer = new EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        // --- LIGHTING ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const spotLight = new THREE.SpotLight(0xffffff, 1000);
+        spotLight.position.set(10, 20, 20);
+        spotLight.angle = 0.5;
+        spotLight.penumbra = 1;
+        spotLight.castShadow = true;
+        scene.add(spotLight);
+
+        const coloredLight1 = new THREE.PointLight(0x00ffff, 50, 50);
+        coloredLight1.position.set(-10, 5, 5);
+        scene.add(coloredLight1);
+
+        const coloredLight2 = new THREE.PointLight(0xff00aa, 50, 50);
+        coloredLight2.position.set(10, -5, 5);
+        scene.add(coloredLight2);
+
+        // --- GLOBAL VARIABLES ---
+        let mainTextMesh, subTextMesh;
+        let fontGlobal;
+        let subTextIndex = 0;
+        let blocks = [];
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let targetRotationX = 0;
+        let targetRotationY = 0;
+        let mouseX = 0;
+        let mouseY = 0;
+        let windowHalfX = window.innerWidth / 2;
+        let windowHalfY = window.innerHeight / 2;
+
+        // --- ASSET LOADING ---
+        const loader = new FontLoader();
+        loader.load('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/fonts/helvetiker_bold.typeface.json', function (font) {
+            fontGlobal = font;
+            
+            createMainText();
+            cycleSubText();
+            createBackgroundBlocks();
+            
+            // Remove loading screen
+            const loadingEl = document.getElementById('loading');
+            loadingEl.style.opacity = 0;
+            setTimeout(() => loadingEl.remove(), 500);
+            
+            animate();
+        });
+
+        // --- TEXT CREATION LOGIC ---
+        function createMainText() {
+            // Adjust size slightly for mobile to fit better
+            const isMobile = window.innerWidth < 600;
+            const size = isMobile ? 2.5 : 3;
+
+            const geometry = new TextGeometry(config.mainText, {
+                font: fontGlobal,
+                size: size,
+                height: 0.8,
+                curveSegments: 12,
+                bevelEnabled: true,
+                bevelThickness: 0.1,
+                bevelSize: 0.05,
+                bevelOffset: 0,
+                bevelSegments: 5
+            });
+
+            geometry.center();
+
+            const material = new THREE.MeshStandardMaterial({
+                color: config.colors.mainText,
+                metalness: 0.8,
+                roughness: 0.2,
+            });
+
+            mainTextMesh = new THREE.Mesh(geometry, material);
+            mainTextMesh.castShadow = true;
+            mainTextMesh.receiveShadow = true;
+            mainTextMesh.position.y = 2;
+            scene.add(mainTextMesh);
+        }
+
+        function createSubText(textString) {
+            if (subTextMesh) {
+                scene.remove(subTextMesh);
+                subTextMesh.geometry.dispose();
+                subTextMesh.material.dispose();
+            }
+
+            const isMobile = window.innerWidth < 600;
+            const size = isMobile ? 0.9 : 1.2;
+
+            const geometry = new TextGeometry(textString, {
+                font: fontGlobal,
+                size: size,
+                height: 0.2,
+                curveSegments: 12,
+                bevelEnabled: true,
+                bevelThickness: 0.02,
+                bevelSize: 0.01,
+                bevelSegments: 3
+            });
+
+            geometry.center();
+
+            const material = new THREE.MeshStandardMaterial({
+                color: config.colors.subText,
+                metalness: 0.5,
+                roughness: 0.5,
+                emissive: 0x440022,
+                emissiveIntensity: 0.5
+            });
+
+            subTextMesh = new THREE.Mesh(geometry, material);
+            subTextMesh.position.y = -2;
+            subTextMesh.position.z = 0;
+            
+            subTextMesh.scale.set(0, 0, 0);
+            scene.add(subTextMesh);
+
+            let s = 0;
+            const animateIn = setInterval(() => {
+                s += 0.1;
+                if(subTextMesh) subTextMesh.scale.set(s,s,s);
+                if(s >= 1) clearInterval(animateIn);
+            }, 30);
+        }
+
+        function cycleSubText() {
+            createSubText(config.subTexts[subTextIndex]);
+            subTextIndex = (subTextIndex + 1) % config.subTexts.length;
+            setTimeout(cycleSubText, 3000);
+        }
+
+        // --- BACKGROUND BLOCKS ---
+        function createBackgroundBlocks() {
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            
+            // Reduce block count slightly on mobile for battery/performance
+            const count = window.innerWidth < 600 ? 100 : 150;
+
+            for (let i = 0; i < count; i++) {
+                const color = config.colors.blocks[Math.floor(Math.random() * config.colors.blocks.length)];
+                const material = new THREE.MeshStandardMaterial({
+                    color: color,
+                    metalness: 0.6,
+                    roughness: 0.4,
+                    transparent: true,
+                    opacity: 0.8
+                });
+
+                const mesh = new THREE.Mesh(geometry, material);
+                
+                mesh.position.x = (Math.random() - 0.5) * 80;
+                mesh.position.y = (Math.random() - 0.5) * 80;
+                mesh.position.z = (Math.random() - 0.5) * 60 - 20;
+
+                mesh.rotation.x = Math.random() * Math.PI;
+                mesh.rotation.y = Math.random() * Math.PI;
+
+                const scale = Math.random() * 1.5 + 0.5;
+                mesh.scale.set(scale, scale, scale);
+                
+                mesh.userData = {
+                    rotationSpeed: {
+                        x: (Math.random() - 0.5) * 0.02,
+                        y: (Math.random() - 0.5) * 0.02
+                    },
+                    initialZ: mesh.position.z
+                };
+
+                blocks.push(mesh);
+                scene.add(mesh);
+            }
+        }
+
+        // --- INPUT & RESPONSIVE LOGIC ---
+        
+        function updateCameraPosition() {
+            const aspect = window.innerWidth / window.innerHeight;
+            // If aspect ratio is low (portrait mobile), move camera back to see width
+            if (aspect < 0.7) {
+                camera.position.z = 55;
+            } else if (aspect < 1.2) {
+                camera.position.z = 40;
+            } else {
+                camera.position.z = 30; // Desktop default
+            }
+        }
+
+        document.addEventListener('mousemove', onDocumentMouseMove);
+        document.addEventListener('click', onDocumentClick);
+        
+        // Touch events for mobile
+        document.addEventListener('touchmove', onDocumentTouchMove, { passive: false });
+        document.addEventListener('touchstart', onDocumentTouchStart, { passive: false });
+        
+        window.addEventListener('resize', onWindowResize);
+
+        function onDocumentMouseMove(event) {
+            mouseX = (event.clientX - windowHalfX) * 0.05;
+            mouseY = (event.clientY - windowHalfY) * 0.05;
+            
+            // Update for raycasting
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        function onDocumentTouchMove(event) {
+            if (event.touches.length === 1) {
+                event.preventDefault(); // Stop scrolling
+                mouseX = (event.touches[0].clientX - windowHalfX) * 0.1; // Higher sensitivity for touch
+                mouseY = (event.touches[0].clientY - windowHalfY) * 0.1;
+            }
+        }
+
+        function onDocumentTouchStart(event) {
+            if (event.touches.length === 1) {
+               // Update mouse coordinates for raycasting on tap
+               mouse.x = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
+               mouse.y = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
+               
+               // Trigger click logic
+               checkIntersects();
+            }
+        }
+
+        function onDocumentClick() {
+            checkIntersects();
+        }
+
+        function checkIntersects() {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(blocks);
+
+            if (intersects.length > 0) {
+                const object = intersects[0].object;
+                object.material.emissive.setHex(0xffffff);
+                object.scale.multiplyScalar(1.5);
+                setTimeout(() => {
+                    object.material.emissive.setHex(0x000000);
+                    object.scale.multiplyScalar(0.66);
+                }, 200);
+            }
+        }
+
+        function onWindowResize() {
+            windowHalfX = window.innerWidth / 2;
+            windowHalfY = window.innerHeight / 2;
+            
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+            
+            updateCameraPosition();
+        }
+
+        // --- ANIMATION LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = Date.now() * 0.001;
+
+            // 1. Camera Movement
+            targetRotationX = mouseX * 0.01;
+            targetRotationY = mouseY * 0.01;
+            
+            camera.position.x += (mouseX - camera.position.x) * 0.05;
+            camera.position.y += (-mouseY - camera.position.y) * 0.05;
+            camera.lookAt(scene.position);
+
+            // 2. Text Animation
+            if (mainTextMesh) {
+                mainTextMesh.rotation.y = Math.sin(time * 0.5) * 0.1;
+                mainTextMesh.rotation.x = Math.cos(time * 0.3) * 0.05;
+            }
+
+            if (subTextMesh) {
+                subTextMesh.rotation.y = Math.sin(time * 0.8) * 0.05;
+            }
+
+            // 3. Block Animation
+            blocks.forEach((block, i) => {
+                block.rotation.x += block.userData.rotationSpeed.x;
+                block.rotation.y += block.userData.rotationSpeed.y;
+                block.position.y += Math.sin(time + i) * 0.02;
+            });
+
+            // 4. Lights
+            coloredLight1.position.x = Math.sin(time * 0.7) * 20;
+            coloredLight1.position.y = Math.cos(time * 0.5) * 20;
+            coloredLight2.position.x = Math.cos(time * 0.3) * 20;
+            coloredLight2.position.y = Math.sin(time * 0.5) * 20;
+
+            // 5. Raycasting for hover (Desktop only mainly)
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(blocks);
+
+            blocks.forEach(b => {
+                if(b.material.emissive.getHex() !== 0xffffff) {
+                     b.material.emissive.setHex(0x000000);
+                }
+            });
+
+            if (intersects.length > 0) {
+                const object = intersects[0].object;
+                if(object.material.emissive.getHex() !== 0xffffff) {
+                    object.material.emissive.setHex(0x333333);
+                }
+                object.rotation.x += 0.1;
+                object.rotation.y += 0.1;
+            }
+
+            composer.render();
+        }
+    </script>
+</body>
+</html>
